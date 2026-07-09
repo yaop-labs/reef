@@ -22,7 +22,13 @@ func Transport(cfg Config) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-	base := http.DefaultTransport.(*http.Transport).Clone()
+	// Clone the process default so we inherit its proxy/timeout knobs; fall back
+	// to a fresh Transport if someone swapped DefaultTransport for a non-stdlib
+	// RoundTripper (avoids a panic on the type assertion).
+	base := &http.Transport{}
+	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
+		base = dt.Clone()
+	}
 	if tlsCfg != nil {
 		base.TLSClientConfig = tlsCfg
 	}
