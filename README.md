@@ -1,11 +1,11 @@
 # reef — платформенная библиотека безопасности yaop
 
-> Статус: **M1+M2 реализованы** (2026-07-07): `tlsconf`, `bearer`,
-> `grpcreef`, `reefclient`, `reeftest` — build/vet/`go test -race` чистые.
-> Осталось: M3 (hot-reload сертификатов) и M4 (миграции продуктов) — см.
-> [docs/04-spec.md](docs/04-spec.md). Решение о создании:
-> `platform-review/contract.md` §8 — «безопасность встроенная, общая
-> библиотека, не сервис».
+> Статус: **M1–M3 реализованы**: `tlsconf`, `bearer`, `grpcreef`,
+> `reefclient`, `reeftest` + hot-reload сертификатов без рестарта (mtime-кэш
+> в `GetCertificate`/`GetClientCertificate`, TTL 5s, без новых зависимостей).
+> build/vet/`go test -race`/golangci-lint v2 чистые. Осталось: **M4**
+> (миграции продуктов) — см. [docs/04-spec.md](docs/04-spec.md). Решение о
+> создании: безопасность встроенная, общая библиотека, не сервис.
 
 **Что это:** один Go-модуль, который даёт всем продуктам платформы
 (wisp / coral / amber / fathom) одинаковые TLS/mTLS и bearer-auth на каждом
