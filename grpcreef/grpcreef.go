@@ -42,9 +42,13 @@ func ServerOptions(tc *tlsconf.ServerConfig, ac *bearer.ServerConfig, opts ...be
 	}
 	if v.Enabled() {
 		set := bearer.Apply(opts...)
+		exempt := make(map[string]bool, len(set.ExemptPaths))
+		for _, p := range set.ExemptPaths {
+			exempt[p] = true
+		}
 		out = append(out,
-			grpc.ChainUnaryInterceptor(unaryAuth(v, set)),
-			grpc.ChainStreamInterceptor(streamAuth(v, set)),
+			grpc.ChainUnaryInterceptor(unaryAuth(v, set, exempt)),
+			grpc.ChainStreamInterceptor(streamAuth(v, set, exempt)),
 		)
 	}
 	return out, nil
@@ -91,25 +95,31 @@ func Dial(_ context.Context, target string, tc *tlsconf.ClientConfig, ac *bearer
 	return grpc.NewClient(target, append(dialOpts, extra...)...)
 }
 
-func unaryAuth(v *bearer.Verifier, set bearer.Settings) grpc.UnaryServerInterceptor {
+func unaryAuth(v *bearer.Verifier, set bearer.Settings, exempt map[string]bool) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if err := authorize(ctx, v, set, info.FullMethod); err != nil {
+		if err := authorize(ctx, v, set, exempt, info.FullMethod); err != nil {
 			return nil, err
 		}
 		return handler(ctx, req)
 	}
 }
 
-func streamAuth(v *bearer.Verifier, set bearer.Settings) grpc.StreamServerInterceptor {
+func streamAuth(v *bearer.Verifier, set bearer.Settings, exempt map[string]bool) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		if err := authorize(ss.Context(), v, set, info.FullMethod); err != nil {
+		if err := authorize(ss.Context(), v, set, exempt, info.FullMethod); err != nil {
 			return err
 		}
 		return handler(srv, ss)
 	}
 }
 
-func authorize(ctx context.Context, v *bearer.Verifier, set bearer.Settings, method string) error {
+// authorize gates one RPC. Exempt methods (bearer.ExemptPaths, matched against
+// the full method name "/pkg.Service/Method") skip auth entirely — the gRPC
+// analogue of the HTTP middleware's exempt paths, e.g. the health service.
+func authorize(ctx context.Context, v *bearer.Verifier, set bearer.Settings, exempt map[string]bool, method string) error {
+	if exempt[method] {
+		return nil
+	}
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		for _, h := range md.Get("authorization") {
 			if tok, ok := bearer.FromHeader(h); ok && v.Verify(tok) {

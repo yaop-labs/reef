@@ -22,9 +22,9 @@ import (
 
 const secret = "grpc-s3cr3t"
 
-func startServer(t *testing.T, tc *tlsconf.ServerConfig, ac *bearer.ServerConfig) *bufconn.Listener {
+func startServer(t *testing.T, tc *tlsconf.ServerConfig, ac *bearer.ServerConfig, authOpts ...bearer.Option) *bufconn.Listener {
 	t.Helper()
-	opts, err := grpcreef.ServerOptions(tc, ac)
+	opts, err := grpcreef.ServerOptions(tc, ac, authOpts...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,6 +95,27 @@ func TestStreamAuth(t *testing.T) {
 	if _, err := stream.Recv(); err != nil {
 		t.Fatalf("authorized watch failed: %v", err)
 	}
+}
+
+func TestExemptMethod(t *testing.T) {
+	ln := startServer(t, nil,
+		&bearer.ServerConfig{Bearer: []bearer.Key{{Name: "a", Token: secret}}},
+		bearer.ExemptPaths("/grpc.health.v1.Health/Check"),
+	)
+
+	// Check is exempt: it must pass without a token.
+	if err := check(dial(t, ln, nil, nil)); err != nil {
+		t.Fatalf("exempt method must skip auth, got %v", err)
+	}
+
+	// Watch is not exempt: it stays gated.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stream, err := healthpb.NewHealthClient(dial(t, ln, nil, nil)).Watch(ctx, &healthpb.HealthCheckRequest{})
+	if err == nil {
+		_, err = stream.Recv()
+	}
+	wantUnauthenticated(t, err)
 }
 
 func TestTLSAndAuth(t *testing.T) {
