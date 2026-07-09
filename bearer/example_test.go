@@ -26,6 +26,12 @@ func ExampleTransport() {
 	if err != nil {
 		panic(err)
 	}
+	// Every request this client makes now carries Authorization: Bearer <token>,
+	// unless the request already sets the header itself.
 	client := &http.Client{Transport: rt}
-	_ = client
+	resp, err := client.Get("https://coral.internal/v1/push")
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 }
