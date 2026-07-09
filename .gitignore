@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Design docs — kept in the internal knowledge vault, not in the public repo
+/docs/
