@@ -39,22 +39,34 @@ type ClientConfig struct {
 	DangerAcceptAny    bool   `yaml:"danger_accept_any"`
 }
 
-// Validate checks the server block. nil-safe.
-func (c *ServerConfig) Validate() ([]Warning, error) {
+// checkFields validates the server block's structure without touching the
+// filesystem, so Server can share the checks without a redundant I/O pass.
+func (c *ServerConfig) checkFields() error {
 	if c == nil {
-		return nil, nil
+		return nil
 	}
 	if !c.Enabled {
 		if c.CertFile != "" || c.KeyFile != "" || c.ClientCAFile != "" || c.MinVersion != "" {
-			return nil, errors.New("tlsconf: tls fields are set but enabled is false; set enabled: true or remove the fields")
+			return errors.New("tlsconf: tls fields are set but enabled is false; set enabled: true or remove the fields")
 		}
-		return nil, nil
+		return nil
 	}
 	if c.CertFile == "" || c.KeyFile == "" {
-		return nil, errors.New("tlsconf: enabled tls requires both cert_file and key_file")
+		return errors.New("tlsconf: enabled tls requires both cert_file and key_file")
 	}
 	if _, err := minVersion(c.MinVersion); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Validate checks the server block. nil-safe.
+func (c *ServerConfig) Validate() ([]Warning, error) {
+	if err := c.checkFields(); err != nil {
 		return nil, err
+	}
+	if c == nil || !c.Enabled {
+		return nil, nil
 	}
 	if _, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile); err != nil {
 		return nil, fmt.Errorf("tlsconf: load cert/key pair: %w", err)
@@ -67,23 +79,35 @@ func (c *ServerConfig) Validate() ([]Warning, error) {
 	return permWarnings(c.KeyFile), nil
 }
 
-// Validate checks the client block. nil-safe.
-func (c *ClientConfig) Validate() ([]Warning, error) {
+// checkFields validates the client block's structure without touching the
+// filesystem, so Client can share the checks without a redundant I/O pass.
+func (c *ClientConfig) checkFields() error {
 	if c == nil {
-		return nil, nil
+		return nil
 	}
 	if !c.Enabled {
 		if c.CAFile != "" || c.CertFile != "" || c.KeyFile != "" || c.ServerName != "" ||
 			c.InsecureSkipVerify || c.DangerAcceptAny {
-			return nil, errors.New("tlsconf: tls fields are set but enabled is false; set enabled: true or remove the fields")
+			return errors.New("tlsconf: tls fields are set but enabled is false; set enabled: true or remove the fields")
 		}
-		return nil, nil
+		return nil
 	}
 	if c.InsecureSkipVerify != c.DangerAcceptAny {
-		return nil, errors.New("tlsconf: insecure_skip_verify requires danger_accept_any: true (and vice versa)")
+		return errors.New("tlsconf: insecure_skip_verify requires danger_accept_any: true (and vice versa)")
 	}
 	if (c.CertFile == "") != (c.KeyFile == "") {
-		return nil, errors.New("tlsconf: cert_file and key_file must be set together")
+		return errors.New("tlsconf: cert_file and key_file must be set together")
+	}
+	return nil
+}
+
+// Validate checks the client block. nil-safe.
+func (c *ClientConfig) Validate() ([]Warning, error) {
+	if err := c.checkFields(); err != nil {
+		return nil, err
+	}
+	if c == nil || !c.Enabled {
+		return nil, nil
 	}
 	if c.CertFile != "" {
 		if _, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile); err != nil {
@@ -108,14 +132,11 @@ func (c *ClientConfig) Validate() ([]Warning, error) {
 // cert/key files change on disk (see certReloader), so rotation needs no
 // restart.
 func Server(c *ServerConfig) (*tls.Config, error) {
-	if c == nil || !c.Enabled {
-		if _, err := c.Validate(); err != nil {
-			return nil, err
-		}
-		return nil, nil
-	}
-	if _, err := c.Validate(); err != nil {
+	if err := c.checkFields(); err != nil {
 		return nil, err
+	}
+	if c == nil || !c.Enabled {
+		return nil, nil
 	}
 	reloader, err := newCertReloader(c.CertFile, c.KeyFile)
 	if err != nil {
@@ -145,14 +166,11 @@ func Server(c *ServerConfig) (*tls.Config, error) {
 // Client builds the dialer-side *tls.Config. Returns (nil, nil) for a nil or
 // disabled block (plaintext dial).
 func Client(c *ClientConfig) (*tls.Config, error) {
-	if c == nil || !c.Enabled {
-		if _, err := c.Validate(); err != nil {
-			return nil, err
-		}
-		return nil, nil
-	}
-	if _, err := c.Validate(); err != nil {
+	if err := c.checkFields(); err != nil {
 		return nil, err
+	}
+	if c == nil || !c.Enabled {
+		return nil, nil
 	}
 	cfg := &tls.Config{
 		MinVersion: tls.VersionTLS13,

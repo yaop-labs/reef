@@ -87,16 +87,23 @@ type Verifier struct {
 }
 
 // NewVerifier resolves every key at startup (files are read once, not per
-// request) and compiles the digest set.
+// request — and once here, not again after a separate Validate pass) and
+// compiles the digest set. Note the tokens themselves do not hot-reload: a
+// rotated token_file is picked up only on restart, unlike TLS certificates.
 func NewVerifier(cfg *ServerConfig) (*Verifier, error) {
-	if _, err := cfg.Validate(); err != nil {
-		return nil, err
-	}
 	v := &Verifier{}
 	if cfg == nil {
 		return v, nil
 	}
-	for _, k := range cfg.Bearer {
+	seen := make(map[string]bool, len(cfg.Bearer))
+	for i, k := range cfg.Bearer {
+		if k.Name == "" {
+			return nil, fmt.Errorf("bearer: key #%d has no name", i)
+		}
+		if seen[k.Name] {
+			return nil, fmt.Errorf("bearer: duplicate key name %q", k.Name)
+		}
+		seen[k.Name] = true
 		tok, err := resolve(k.Token, k.TokenFile, k.TokenEnv)
 		if err != nil {
 			return nil, fmt.Errorf("bearer: key %q: %w", k.Name, err)
