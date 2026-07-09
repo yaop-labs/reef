@@ -1,0 +1,62 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  go: "1.26"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - misspell
+    - revive
+    - unconvert
+    - unparam
+    - gocritic
+    - gosec
+    - prealloc
+    - copyloopvar
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+    gosec:
+      excludes:
+        - G104 # errcheck already covers unchecked errors
+        - G304 # cert/token file paths come from the product's own config, not request input
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - singleCaseSwitch
+    errcheck:
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+          - unparam
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/yaop-labs/reef
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
