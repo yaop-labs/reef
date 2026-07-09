@@ -219,9 +219,11 @@ func TestTransport(t *testing.T) {
 	}
 	client := &http.Client{Transport: rt}
 
-	if _, err := client.Get(srv.URL); err != nil {
+	resp, err := client.Get(srv.URL)
+	if err != nil {
 		t.Fatal(err)
 	}
+	resp.Body.Close()
 	if got.Load() != "Bearer "+secret {
 		t.Fatalf("token not injected: %q", got.Load())
 	}
@@ -229,9 +231,11 @@ func TestTransport(t *testing.T) {
 	// An explicit Authorization header on the request wins.
 	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	req.Header.Set("Authorization", "Bearer explicit")
-	if _, err := client.Do(req); err != nil {
+	resp2, err := client.Do(req)
+	if err != nil {
 		t.Fatal(err)
 	}
+	resp2.Body.Close()
 	if got.Load() != "Bearer explicit" {
 		t.Fatalf("explicit header overwritten: %q", got.Load())
 	}
