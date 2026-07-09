@@ -49,3 +49,9 @@ rt, err := reefclient.Transport(reefclient.Config{TLS: cfg.Client.TLS, Auth: cfg
 // gRPC-клиент
 conn, err := grpcreef.Dial(ctx, addr, cfg.Client.TLS, cfg.Client.Auth)
 ```
+
+**Что перезагружается на лету:** TLS-сертификаты (`cert_file`/`key_file`)
+подхватываются без рестарта — mtime-кэш в `GetCertificate`/
+`GetClientCertificate`, TTL 5s. Bearer-**токены** так не работают: `token_file`
+читается один раз при старте, ротация токена требует перезапуска процесса.
+
