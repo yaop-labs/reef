@@ -130,8 +130,8 @@ func (v *Verifier) Verify(token string) bool {
 	return match == 1
 }
 
-// Settings are the materialized Options — exported so implementations outside
-// this package (grpcreef) honor the same knobs.
+// Settings are the materialized Options, exported so implementations outside
+// this package (grpcreef) honor the same options.
 type Settings struct {
 	ExemptPaths []string
 	OnFailure   func(remoteAddr, path string)
@@ -146,8 +146,8 @@ func ExemptPaths(paths ...string) Option {
 	return func(s *Settings) { s.ExemptPaths = paths }
 }
 
-// OnFailure installs a hook called on every rejected request — the place to
-// wire a selfobs counter. It must not block.
+// OnFailure installs a hook called on every rejected request, e.g. to
+// increment a metrics counter. It must not block.
 func OnFailure(f func(remoteAddr, path string)) Option {
 	return func(s *Settings) { s.OnFailure = f }
 }

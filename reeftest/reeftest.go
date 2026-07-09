@@ -1,6 +1,5 @@
 // Package reeftest generates throwaway certificates for tests: a CA, a server
 // certificate for localhost, and a client certificate signed by the same CA.
-// It exists so every product stops growing its own copy (wisp REVIEW №36).
 package reeftest
 
 import (

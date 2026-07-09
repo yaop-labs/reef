@@ -23,9 +23,8 @@ type clientYAML struct {
 	Auth bearer.ClientConfig  `yaml:"auth"`
 }
 
-// TestYAMLConfigSmoke drives a gRPC edge configured entirely from the schema in
-// docs/03-api.md: a token-bearing client is served, a tokenless one gets
-// Unauthenticated.
+// TestYAMLConfigSmoke drives a gRPC edge configured entirely from the YAML
+// schema: a token-bearing client is served, a tokenless one gets Unauthenticated.
 func TestYAMLConfigSmoke(t *testing.T) {
 	certs := reeftest.GenCerts(t, t.TempDir())
 	const secret = "grpc-yaml-s3cr3t"

@@ -55,9 +55,9 @@ func ServerOptions(tc *tlsconf.ServerConfig, ac *bearer.ServerConfig, opts ...be
 }
 
 // DialOptions assembles the client side: transport credentials from the TLS
-// block (insecure credentials when disabled — single-node plaintext), and
-// per-RPC bearer credentials when a token is configured. The token is sent
-// even over plaintext: on a single node that is the deliberate dev mode.
+// block (insecure credentials when TLS is disabled), and per-RPC bearer
+// credentials when a token is configured. The token is sent even over
+// plaintext; RequireTransportSecurity reports false in that case.
 func DialOptions(tc *tlsconf.ClientConfig, ac *bearer.ClientConfig) ([]grpc.DialOption, error) {
 	var out []grpc.DialOption
 
@@ -85,8 +85,7 @@ func DialOptions(tc *tlsconf.ClientConfig, ac *bearer.ClientConfig) ([]grpc.Dial
 }
 
 // Dial builds the client connection from the two config blocks plus any extra
-// options. ctx is reserved for parity with future connect-on-dial semantics;
-// the underlying grpc.NewClient connects lazily.
+// options. ctx is currently unused; grpc.NewClient connects lazily.
 func Dial(_ context.Context, target string, tc *tlsconf.ClientConfig, ac *bearer.ClientConfig, extra ...grpc.DialOption) (*grpc.ClientConn, error) {
 	dialOpts, err := DialOptions(tc, ac)
 	if err != nil {

@@ -1,5 +1,5 @@
 // Package tlsconf builds server- and client-side *tls.Config values from the
-// platform's shared YAML schema (reef docs/03-api.md).
+// shared tls YAML config block.
 //
 // Fail-stop rule: a block with fields set but enabled: false is a startup
 // error, never a silent plaintext edge. A fully empty/nil block is deliberate

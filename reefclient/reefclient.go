@@ -1,5 +1,5 @@
 // Package reefclient assembles the client side of an HTTP edge in one call:
-// TLS from tlsconf plus bearer-token injection — what an exporter needs.
+// TLS from tlsconf plus bearer-token injection.
 package reefclient
 
 import (
@@ -22,9 +22,8 @@ func Transport(cfg Config) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Clone the process default so we inherit its proxy/timeout knobs; fall back
-	// to a fresh Transport if someone swapped DefaultTransport for a non-stdlib
-	// RoundTripper (avoids a panic on the type assertion).
+	// Clone the process default to inherit its proxy/timeout settings; fall back
+	// to a fresh Transport if DefaultTransport is not a *http.Transport.
 	base := &http.Transport{}
 	if dt, ok := http.DefaultTransport.(*http.Transport); ok {
 		base = dt.Clone()

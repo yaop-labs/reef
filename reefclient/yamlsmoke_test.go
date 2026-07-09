@@ -17,17 +17,15 @@ import (
 	"github.com/yaop-labs/reef/tlsconf"
 )
 
-// serverYAML is the receiver's config as a product embeds it: reef's tls/auth
-// blocks under their documented keys (docs/03-api.md).
+// serverYAML is the server-side tls/auth config as a product embeds it.
 type serverYAML struct {
 	TLS  tlsconf.ServerConfig `yaml:"tls"`
 	Auth bearer.ServerConfig  `yaml:"auth"`
 }
 
-// TestYAMLConfigSmoke parses the exact schema from docs/03-api.md into reef's
-// structs and drives a full HTTP edge end-to-end. It proves the yaml tags match
-// the documented contract (a tag typo would fail here and nowhere else) and
-// that a tokenless client is refused.
+// TestYAMLConfigSmoke parses the documented YAML schema into reef's structs and
+// drives a full HTTP edge end-to-end: the yaml tags must match, and a tokenless
+// client must be refused.
 func TestYAMLConfigSmoke(t *testing.T) {
 	certs := reeftest.GenCerts(t, t.TempDir())
 	const secret = "yaml-smoke-s3cr3t"
