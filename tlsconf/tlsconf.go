@@ -104,8 +104,9 @@ func (c *ClientConfig) Validate() ([]Warning, error) {
 
 // Server builds the listener-side *tls.Config. Returns (nil, nil) for a nil or
 // disabled block: the caller serves plaintext and must call WarnIfPlaintext.
-// Certificates are served through GetCertificate so a future hot-reload can
-// land without a signature change.
+// The certificate is served through GetCertificate and hot-reloads when the
+// cert/key files change on disk (see certReloader), so rotation needs no
+// restart.
 func Server(c *ServerConfig) (*tls.Config, error) {
 	if c == nil || !c.Enabled {
 		if _, err := c.Validate(); err != nil {
@@ -116,7 +117,7 @@ func Server(c *ServerConfig) (*tls.Config, error) {
 	if _, err := c.Validate(); err != nil {
 		return nil, err
 	}
-	cert, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
+	reloader, err := newCertReloader(c.CertFile, c.KeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("tlsconf: load cert/key pair: %w", err)
 	}
@@ -127,7 +128,7 @@ func Server(c *ServerConfig) (*tls.Config, error) {
 	cfg := &tls.Config{
 		MinVersion: minV,
 		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
-			return &cert, nil
+			return reloader.get(), nil
 		},
 	}
 	if c.ClientCAFile != "" {
@@ -165,12 +166,12 @@ func Client(c *ClientConfig) (*tls.Config, error) {
 		cfg.RootCAs = pool
 	}
 	if c.CertFile != "" {
-		cert, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
+		reloader, err := newCertReloader(c.CertFile, c.KeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("tlsconf: load client cert/key pair: %w", err)
 		}
 		cfg.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			return &cert, nil
+			return reloader.get(), nil
 		}
 	}
 	if c.InsecureSkipVerify && c.DangerAcceptAny {
