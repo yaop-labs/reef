@@ -236,6 +236,9 @@ func (m *Managed[T]) Close() error {
 		close(m.stop)
 		<-m.done
 		m.reloadMu.Lock()
+		// Observe the state while holding the reload lock so Close also
+		// waits for a synchronous ReloadNow call already in progress.
+		_ = m.current.Load()
 		m.reloadMu.Unlock()
 	})
 	return nil

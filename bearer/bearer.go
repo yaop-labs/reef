@@ -426,7 +426,7 @@ func resolve(inline, file, env string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("read token file: %w", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		b, err := io.ReadAll(io.LimitReader(f, MaxTokenBytes+2))
 		if err != nil {
 			return "", fmt.Errorf("read token file: %w", err)
