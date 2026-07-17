@@ -176,6 +176,23 @@ func TestRequireDisabled(t *testing.T) {
 	}
 }
 
+func TestLowLevelCompatibilityWrappers(t *testing.T) {
+	v, err := bearer.NewVerifier(serverCfg(bearer.Key{Name: "main", Token: secret}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Verify(secret) {
+		t.Fatal("NewVerifier wrapper did not materialize the configured key")
+	}
+	token, err := bearer.ClientToken(&bearer.ClientConfig{Token: secret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token != secret {
+		t.Fatalf("ClientToken = %q", token)
+	}
+}
+
 func TestRequireConcurrent(t *testing.T) {
 	mw, err := bearer.Require(serverCfg(bearer.Key{Name: "main", Token: secret}))
 	if err != nil {
@@ -251,6 +268,35 @@ func TestTransportEmptyConfig(t *testing.T) {
 	}
 }
 
+func TestTransportNilHeader(t *testing.T) {
+	var got string
+	base := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		got = req.Header.Get("Authorization")
+		return &http.Response{
+			StatusCode: http.StatusNoContent,
+			Header:     make(http.Header),
+			Body:       http.NoBody,
+			Request:    req,
+		}, nil
+	})
+	rt, err := bearer.Transport(&bearer.ClientConfig{Token: secret}, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := &http.Request{Method: http.MethodGet, Header: nil}
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if got != "Bearer "+secret {
+		t.Fatalf("token not injected for nil Header: %q", got)
+	}
+	if req.Header != nil {
+		t.Fatal("transport must not mutate the original request")
+	}
+}
+
 func TestSecretHygiene(t *testing.T) {
 	// Every validation error path must keep token values out of messages.
 	cfgs := []*bearer.ServerConfig{
@@ -267,4 +313,10 @@ func TestSecretHygiene(t *testing.T) {
 	} else if strings.Contains(err.Error(), secret) {
 		t.Fatalf("error leaks token value: %v", err)
 	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }

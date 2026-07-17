@@ -1,11 +1,10 @@
 package grpcreef_test
 
 import (
-	"context"
-
 	"google.golang.org/grpc"
 
 	"github.com/yaop-labs/reef/bearer"
+	"github.com/yaop-labs/reef/edge"
 	"github.com/yaop-labs/reef/grpcreef"
 	"github.com/yaop-labs/reef/tlsconf"
 )
@@ -24,10 +23,25 @@ func ExampleServerOptions() {
 	_ = srv
 }
 
-// ExampleDial opens a client connection that presents the bearer token per RPC.
-func ExampleDial() {
-	conn, err := grpcreef.Dial(
-		context.Background(), "coral.internal:4317",
+// ExampleNewEdgeClient opens a policy-validated production client.
+func ExampleNewEdgeClient() {
+	conn, warnings, err := grpcreef.NewEdgeClient(edge.ClientConfig{
+		Target: "coral.internal:4317",
+		TLS:    &tlsconf.ClientConfig{Enabled: true, CAFile: "ca.crt", ServerName: "coral.internal"},
+		Auth:   &bearer.ClientConfig{TokenFile: "/etc/yaop/tokens/this-agent"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	_ = warnings
+	defer conn.Close()
+}
+
+// ExampleNewClient opens a lazy client connection that presents the bearer
+// token per RPC.
+func ExampleNewClient() {
+	conn, err := grpcreef.NewClient(
+		"coral.internal:4317",
 		&tlsconf.ClientConfig{Enabled: true, CAFile: "ca.crt", ServerName: "coral.internal"},
 		&bearer.ClientConfig{TokenFile: "/etc/yaop/tokens/this-agent"},
 	)
