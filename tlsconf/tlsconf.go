@@ -132,19 +132,26 @@ func (c *ClientConfig) Validate() ([]Warning, error) {
 // cert/key files change on disk (see certReloader), so rotation needs no
 // restart.
 func Server(c *ServerConfig) (*tls.Config, error) {
+	cfg, _, err := BuildServer(c)
+	return cfg, err
+}
+
+// BuildServer materializes the listener TLS config and permission warnings in
+// one filesystem pass.
+func BuildServer(c *ServerConfig) (*tls.Config, []Warning, error) {
 	if err := c.checkFields(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if c == nil || !c.Enabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 	reloader, err := newCertReloader(c.CertFile, c.KeyFile)
 	if err != nil {
-		return nil, fmt.Errorf("tlsconf: load cert/key pair: %w", err)
+		return nil, nil, fmt.Errorf("tlsconf: load cert/key pair: %w", err)
 	}
 	minV, err := minVersion(c.MinVersion)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	cfg := &tls.Config{
 		MinVersion: minV,
@@ -155,22 +162,29 @@ func Server(c *ServerConfig) (*tls.Config, error) {
 	if c.ClientCAFile != "" {
 		pool, err := loadCertPool(c.ClientCAFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		cfg.ClientCAs = pool
 		cfg.ClientAuth = tls.RequireAndVerifyClientCert
 	}
-	return cfg, nil
+	return cfg, permWarnings(c.KeyFile), nil
 }
 
 // Client builds the dialer-side *tls.Config. Returns (nil, nil) for a nil or
 // disabled block (plaintext dial).
 func Client(c *ClientConfig) (*tls.Config, error) {
+	cfg, _, err := BuildClient(c)
+	return cfg, err
+}
+
+// BuildClient materializes the dialer TLS config and permission warnings in
+// one filesystem pass.
+func BuildClient(c *ClientConfig) (*tls.Config, []Warning, error) {
 	if err := c.checkFields(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if c == nil || !c.Enabled {
-		return nil, nil
+		return nil, nil, nil
 	}
 	cfg := &tls.Config{
 		MinVersion: tls.VersionTLS13,
@@ -179,14 +193,14 @@ func Client(c *ClientConfig) (*tls.Config, error) {
 	if c.CAFile != "" {
 		pool, err := loadCertPool(c.CAFile)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		cfg.RootCAs = pool
 	}
 	if c.CertFile != "" {
 		reloader, err := newCertReloader(c.CertFile, c.KeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("tlsconf: load client cert/key pair: %w", err)
+			return nil, nil, fmt.Errorf("tlsconf: load client cert/key pair: %w", err)
 		}
 		cfg.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			return reloader.get(), nil
@@ -195,7 +209,11 @@ func Client(c *ClientConfig) (*tls.Config, error) {
 	if c.InsecureSkipVerify && c.DangerAcceptAny {
 		cfg.InsecureSkipVerify = true
 	}
-	return cfg, nil
+	var warns []Warning
+	if c.KeyFile != "" {
+		warns = permWarnings(c.KeyFile)
+	}
+	return cfg, warns, nil
 }
 
 // WarnIfPlaintext logs exactly one warning when an edge runs without TLS.
